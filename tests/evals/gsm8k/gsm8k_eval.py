@@ -12,6 +12,7 @@ import json
 import os
 import time
 from collections.abc import Generator
+from typing import Optional, Union
 
 import aiohttp
 import numpy as np
@@ -22,7 +23,7 @@ from tqdm.asyncio import tqdm
 INVALID = -9999999
 
 
-def download_and_cache_file(url: str, filename: str | None = None) -> str:
+def download_and_cache_file(url: str, filename: Optional[str] = None) -> str:
     """Download and cache a file from a URL."""
     if filename is None:
         filename = os.path.join("/tmp", url.split("/")[-1])
@@ -75,15 +76,13 @@ def get_answer_value(answer_str: str) -> int:
         return INVALID
 
 
-async def call_vllm_api(
-    session: aiohttp.ClientSession,
-    prompt: str,
-    temperature: float,
-    max_tokens: int,
-    stop: list[str] | None = None,
-    url: str | None = None,
-    seed: int | None = None,
-) -> str:
+async def call_vllm_api(session: aiohttp.ClientSession,
+                        prompt: str,
+                        temperature: float,
+                        max_tokens: int,
+                        stop: Optional[list[str]] = None,
+                        url: Optional[str] = None,
+                        seed: Optional[int] = None) -> str:
     """Call vLLM's OpenAI-compatible completions endpoint."""
     data = {
         "prompt": prompt,
@@ -95,7 +94,8 @@ async def call_vllm_api(
         data["seed"] = seed
 
     try:
-        async with session.post(f"{url}/v1/completions", json=data) as response:
+        async with session.post(f"{url}/v1/completions",
+                                json=data) as response:
             response.raise_for_status()
             result = await response.json()
             return result["choices"][0]["text"]
@@ -104,18 +104,16 @@ async def call_vllm_api(
         return ""
 
 
-def evaluate_gsm8k(
-    num_questions: int = 1319,
-    num_shots: int = 5,
-    max_tokens: int = 256,
-    host: str = "http://127.0.0.1",
-    port: int = 8000,
-    temperature: float = 0.0,
-    seed: int | None = 42,
-) -> dict[str, float | int]:
+def evaluate_gsm8k(num_questions: int = 1319,
+                   num_shots: int = 5,
+                   max_tokens: int = 256,
+                   host: str = "http://127.0.0.1",
+                   port: int = 8000,
+                   temperature: float = 0.0,
+                   seed: Optional[int] = 42) -> dict[str, Union[float, int]]:
     """
     Evaluate GSM8K accuracy using vLLM serve endpoint.
-
+    
     Returns dict with accuracy, invalid_rate, latency, etc.
     """
     base_url = f"{host}:{port}"
@@ -129,10 +127,8 @@ def evaluate_gsm8k(
     # Build few-shot examples from train split (like lm-eval does)
     few_shot_examples = ""
     for i in range(num_shots):
-        few_shot_examples += (
-            f"Question: {train_data[i]['question']}\n"
-            f"Answer: {train_data[i]['answer']}\n\n"
-        )
+        few_shot_examples += (f"Question: {train_data[i]['question']}\n"
+                              f"Answer: {train_data[i]['answer']}\n\n")
 
     # Prepare test questions and labels from test split
     questions = []
@@ -161,15 +157,15 @@ def evaluate_gsm8k(
             states[i] = answer
             return answer
 
-        async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=600)
-        ) as session:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(
+                total=600)) as session:
             tasks = [get_answer(session, i) for i in range(num_questions)]
             await tqdm.gather(*tasks, desc="Evaluating")
 
         return states
 
-    print(f"Running GSM8K evaluation: {num_questions} questions, {num_shots}-shot")
+    print(f"Running GSM8K evaluation: {num_questions} questions, "
+          f"{num_shots}-shot")
 
     tic = time.perf_counter()
     states = asyncio.run(run_async_evaluation())
@@ -195,28 +191,36 @@ def evaluate_gsm8k(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="GSM8K evaluation for vLLM serve")
-    parser.add_argument(
-        "--num-shots", type=int, default=5, help="Number of few-shot examples"
-    )
-    parser.add_argument(
-        "--num-questions",
-        type=int,
-        default=1319,
-        help="Number of questions to evaluate",
-    )
-    parser.add_argument(
-        "--max-tokens", type=int, default=256, help="Max tokens for generation"
-    )
-    parser.add_argument("--host", type=str, default="http://127.0.0.1", help="Host URL")
+    parser = argparse.ArgumentParser(
+        description="GSM8K evaluation for vLLM serve")
+    parser.add_argument("--num-shots",
+                        type=int,
+                        default=5,
+                        help="Number of few-shot examples")
+    parser.add_argument("--num-questions",
+                        type=int,
+                        default=1319,
+                        help="Number of questions to evaluate")
+    parser.add_argument("--max-tokens",
+                        type=int,
+                        default=256,
+                        help="Max tokens for generation")
+    parser.add_argument("--host",
+                        type=str,
+                        default="http://127.0.0.1",
+                        help="Host URL")
     parser.add_argument("--port", type=int, default=8000, help="Port number")
-    parser.add_argument(
-        "--temperature", type=float, default=0.0, help="Temperature for generation"
-    )
-    parser.add_argument(
-        "--seed", type=int, default=42, help="Random seed for reproducibility"
-    )
-    parser.add_argument("--save-results", type=str, help="Save results to JSON file")
+    parser.add_argument("--temperature",
+                        type=float,
+                        default=0.0,
+                        help="Temperature for generation")
+    parser.add_argument("--seed",
+                        type=int,
+                        default=42,
+                        help="Random seed for reproducibility")
+    parser.add_argument("--save-results",
+                        type=str,
+                        help="Save results to JSON file")
 
     args = parser.parse_args()
 

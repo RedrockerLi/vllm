@@ -42,7 +42,7 @@ echo "lanching vllm..."
 echo "logging to $VLLM_LOG"
 echo
 
-vllm serve $MODEL \
+VLLM_USE_V1=1 vllm serve $MODEL \
  --seed 42 \
  --max-num-seqs $MAX_NUM_SEQS \
  --max-num-batched-tokens $MAX_NUM_BATCHED_TOKENS \

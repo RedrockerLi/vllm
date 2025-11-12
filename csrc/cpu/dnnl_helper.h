@@ -101,7 +101,7 @@ class DNNLMatMulPrimitiveHandler {
  protected:
   DNNLMatMulPrimitiveHandler(const Args& args, dnnl::memory::data_type b_type);
 
-  void prepack_weight(void* original_b_ptr, dnnl::memory::desc original_b_md,
+  void prepack_weight(void* original_b_ptr,
                       dnnl::memory::desc b_target_mem_desc);
 
   void set_runtime_memory_ptr(size_t index, dnnl_memory* memory_ptr);
@@ -199,7 +199,6 @@ class MatMulPrimitiveHandler : public DNNLMatMulPrimitiveHandler {
   struct ClassMatmulCacheKey {
     dnnl_dim_t b_n_size;
     dnnl_dim_t b_k_size;
-    dnnl::memory::data_type b_type;
 
     friend bool operator==(const ClassMatmulCacheKey& l,
                            const ClassMatmulCacheKey& r);
